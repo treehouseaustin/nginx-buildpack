@@ -132,7 +132,7 @@ install-nginx-lua() {
 
     curl -#L $resty_redis_url | tar xz
 
-    cond-install $nginx_lua_dir/lua-resty-redis-v$RESTY_REDIS_VERSION/lib/resty/redis.lua vendor/nginx_lua/redis.lua
+    cond-install $nginx_lua_dir/lua-resty-redis-$RESTY_REDIS_VERSION/lib/resty/redis.lua vendor/nginx_lua/redis.lua
 }
 
 cond-install() {
