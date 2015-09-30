@@ -61,7 +61,7 @@ build-lua() {
         set-indent
 
         mkdir -p $lua_build_dir
-        cd lua_build_dir
+        cd $lua_build_dir
 
         curl -#L $lua_jit_url | tar xz
         cd LuaJIT-$LUA_JIT_VERSION
