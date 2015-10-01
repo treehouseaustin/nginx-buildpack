@@ -154,9 +154,6 @@ set-vars() {
         NGINX_SOCKET=unix:$NGINX_SOCKET
     fi
 
-    # Override $PORT for the app
-    PORT=$NGINX_SOCKET
-
     export ${!NGINX_*} PORT
 }
 
