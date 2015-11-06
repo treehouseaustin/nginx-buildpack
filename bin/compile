@@ -24,16 +24,16 @@ main() {
     build-lua
 
     declare cached_version
-    if ! is-enabled "$NGINX_FORCE_BUILD"; then
-        cached_version=$($CACHE_DIR/sbin/nginx -V 2>&1 | head -n1 | awk -F/ '{print $NF}') || true
-    fi
+    # if ! is-enabled "$NGINX_FORCE_BUILD"; then
+    #     cached_version=$($CACHE_DIR/sbin/nginx -V 2>&1 | head -n1 | awk -F/ '{print $NF}') || true
+    # fi
 
-    if [[ "$cached_version" != "$NGINX_VERSION" ]]; then
+    # if [[ "$cached_version" != "$NGINX_VERSION" ]]; then
         announce "Building NGINX $NGINX_VERSION"
         build-nginx $CACHE_DIR
-    else
-        announce "Using cached NGINX $NGINX_VERSION"
-    fi
+    # else
+    #     announce "Using cached NGINX $NGINX_VERSION"
+    # fi
 
     install $CACHE_DIR/sbin/nginx bin/nginx
     install $BUILDPACK_DIR/bin/start-nginx bin/start-nginx
