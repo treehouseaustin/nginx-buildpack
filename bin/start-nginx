@@ -23,19 +23,6 @@ run-nginx() {
     rm -f "$psmgr"
     mkfifo "$psmgr"
 
-    # Start app.
-    app-start SIGTERM "$@"
-    pid=$!
-
-    # Wait for app to start.
-    if is-enabled "$NGINX_WAIT_ENABLED"; then
-        while [[ ! -e "$NGINX_WAIT_FILE" ]]; do
-            at app-waiting
-            sleep 1
-        done
-        at app-initialized
-    fi
-
     # Create logs dir. NGINX insists on creating logs/error.log even
     # though it will remain an empty file, with actual logging on stderr.
     mkdir -p logs
@@ -59,16 +46,6 @@ run-nginx() {
     # rather than blocking because there's nothing reading the other end.
     rm -f "$psmgr"
 
-    # Clean up any running processes.
-    # SIGTERM application just in case something else crashed.
-    # If the dyno is shutting down, then SIGTERM has already been sent.
-    at "kill-app pid=$pid"
-    kill -SIGTERM $pid
-
-    # Wait for the app to finish.
-    at "wait-app pid=$pid"
-    wait $pid
-
     # Kill the auxiliary processes.
     # Send each one SIGHUP which will be translated by the trap in aux-start.
     declare name
@@ -76,35 +53,6 @@ run-nginx() {
         at "kill-aux name=$name pid=${pids[$name]} signal=${signals[$name]}"
         kill -SIGHUP "${pids[$name]}"
     done
-}
-
-app-start() {
-    declare name=app signal=$1
-    shift
-
-    (
-        at "$name-start"
-
-        # Start child in the background. This is before the trap because
-        # the app needs to be able to receive when the dyno broadcasts
-        # SIGTERM on shutdown.
-        "$@" &
-
-        # Translate SIGHUP/SIGTERM to the appropriate signal to stop the child
-        # (probably SIGTERM in this case). Since this doesn't exit, it won't
-        # cancel the wait.
-        trap "kill -$signal $!" SIGHUP SIGTERM
-
-        # Wait for the app to finish, either by crash or by $signal
-        wait
-
-        # Notify FIFO if this finishes first
-        echo "$name" > "$psmgr"
-
-        at "$name-end"
-    ) &
-
-    at "$name-launched pid=$!"
 }
 
 aux-start() {
@@ -143,8 +91,6 @@ set-vars() {
     : ${NGINX_ENABLED:=1}
     : ${NGINX_LISTEN:=$PORT}
     : ${NGINX_SOCKET:=/tmp/nginx.socket}
-    : ${NGINX_WAIT_FILE:=$NGINX_SOCKET}
-    : ${NGINX_WAIT_ENABLED:=1}
     : ${NGINX_WORKERS:=4}
     NGINX_GZIP_ENABLED=$(norm-enabled "${NGINX_GZIP_ENABLED:-1}")
     : ${NGINX_GZIP_PROXIED:=any}

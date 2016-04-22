@@ -6,40 +6,30 @@ main() {
     CACHE_DIR=$2    # /app/tmp/cache
     ENV_DIR=$3
     BUILDPACK_DIR=$(readlink -f $(dirname $(type -P "$0"))/..)
-    LUA_JIT_DIR=$BUILD_DIR/vendor/lua_jit
 
-    LUA_JIT_VERSION=2.0.4
-    NGINX_VERSION=1.8.0
-    NGINX_PCRE_VERSION=8.37
-    NGINX_HEADERS_MORE_VERSION=0.261
-    NGINX_DEVEL_KIT_VERSION=0.2.19
-    NGINX_LUA_VERSION=0.9.18
-    RESTY_REDIS_VERSION=0.21
+    NGINX_VERSION=1.9.15
+    NGINX_PCRE_VERSION=8.38
 
     set -eo pipefail
 
     load-env
 
-    announce "Building LuaJIT $LUA_JIT_VERSION"
-    build-lua
-
     declare cached_version
-    # if ! is-enabled "$NGINX_FORCE_BUILD"; then
-    #     cached_version=$($CACHE_DIR/sbin/nginx -V 2>&1 | head -n1 | awk -F/ '{print $NF}') || true
-    # fi
+    if ! is-enabled "$NGINX_FORCE_BUILD"; then
+        cached_version=$($CACHE_DIR/sbin/nginx -V 2>&1 | head -n1 | awk -F/ '{print $NF}') || true
+    fi
 
-    # if [[ "$cached_version" != "$NGINX_VERSION" ]]; then
+    if [[ "$cached_version" != "$NGINX_VERSION" ]]; then
         announce "Building NGINX $NGINX_VERSION"
         build-nginx $CACHE_DIR
-    # else
-    #     announce "Using cached NGINX $NGINX_VERSION"
-    # fi
+    else
+        announce "Using cached NGINX $NGINX_VERSION"
+    fi
 
     install $CACHE_DIR/sbin/nginx bin/nginx
     install $BUILDPACK_DIR/bin/start-nginx bin/start-nginx
     cond-install $BUILDPACK_DIR/config/mime.types config/mime.types
     cond-install $BUILDPACK_DIR/config/nginx.conf.erb config/nginx.conf.erb
-    install-nginx-lua
 }
 
 load-env() {
@@ -52,34 +42,12 @@ load-env() {
     done
 }
 
-build-lua() {
-    declare lua_build_dir=/tmp/lua-build
-
-    declare lua_jit_url=http://luajit.org/download/LuaJIT-$LUA_JIT_VERSION.tar.gz
-
-    (
-        set-indent
-
-        mkdir -p $lua_build_dir
-        cd $lua_build_dir
-
-        curl -#L $lua_jit_url | tar xz
-        cd LuaJIT-$LUA_JIT_VERSION
-
-        make PREFIX=$LUA_JIT_DIR
-        make install PREFIX=$LUA_JIT_DIR
-    )
-}
-
 build-nginx() {
     declare nginx_install_dir=$1
     declare nginx_build_dir=/tmp/nginx-build
 
     declare nginx_url=http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz
     declare pcre_url=http://downloads.sourceforge.net/project/pcre/pcre/$NGINX_PCRE_VERSION/pcre-$NGINX_PCRE_VERSION.tar.bz2
-    declare headers_more_url=https://github.com/agentzh/headers-more-nginx-module/archive/v$NGINX_HEADERS_MORE_VERSION.tar.gz
-    declare devel_kit_url=https://github.com/simpl/ngx_devel_kit/archive/v$NGINX_DEVEL_KIT_VERSION.tar.gz
-    declare nginx_lua_url=https://github.com/openresty/lua-nginx-module/archive/v$NGINX_LUA_VERSION.tar.gz
 
     (
         set-indent
@@ -90,21 +58,10 @@ build-nginx() {
         curl -#L $nginx_url | tar xz
         cd nginx-$NGINX_VERSION
         curl -#L $pcre_url | tar xj
-        curl -#L $headers_more_url | tar xz
-        curl -#L $devel_kit_url | tar xz
-        curl -#L $nginx_lua_url | tar xz
-
-        patch -p1 < $BUILDPACK_DIR/nginx-$NGINX_VERSION-heroku.patch
-
-        export LUAJIT_LIB=$LUA_JIT_DIR/lib
-        export LUAJIT_INC=$LUA_JIT_DIR/include/luajit-2.0
 
         CFLAGS="-O3 -pipe" ./configure \
             --prefix=$nginx_install_dir \
             --with-pcre=pcre-$NGINX_PCRE_VERSION \
-            --add-module=$PWD/headers-more-nginx-module-$NGINX_HEADERS_MORE_VERSION \
-            --add-module=$PWD/ngx_devel_kit-$NGINX_DEVEL_KIT_VERSION \
-            --add-module=$PWD/lua-nginx-module-$NGINX_LUA_VERSION \
             --with-http_addition_module \
             --with-http_dav_module \
             --with-http_gzip_static_module \
@@ -117,22 +74,7 @@ build-nginx() {
 
         mkdir -p $nginx_install_dir
         make install
-
-        unset LUAJIT_LIB
-        unset LUAJIT_INC
     )
-}
-
-install-nginx-lua() {
-    declare nginx_lua_dir=/tmp/nginx-lua
-    declare resty_redis_url=https://github.com/openresty/lua-resty-redis/archive/v$RESTY_REDIS_VERSION.tar.gz
-
-    mkdir -p $nginx_lua_dir
-    cd $nginx_lua_dir
-
-    curl -#L $resty_redis_url | tar xz
-
-    cond-install $nginx_lua_dir/lua-resty-redis-$RESTY_REDIS_VERSION/lib/resty/redis.lua vendor/nginx_lua/redis.lua
 }
 
 cond-install() {
