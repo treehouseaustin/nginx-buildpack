@@ -45,14 +45,6 @@ run-nginx() {
     # Remove the FIFO. This allows following writes to simply create a file,
     # rather than blocking because there's nothing reading the other end.
     rm -f "$psmgr"
-
-    # Kill the auxiliary processes.
-    # Send each one SIGHUP which will be translated by the trap in aux-start.
-    declare name
-    for name in "${!pids[@]}"; do
-        at "kill-aux name=$name pid=${pids[$name]} signal=${signals[$name]}"
-        kill -SIGHUP "${pids[$name]}"
-    done
 }
 
 aux-start() {
